@@ -85,7 +85,7 @@ def get_path_filename(str_localdir):
 '''
 # """ function for uploading source location to designated id """
 '''
-def upload_file_1(drive, no_path_filename, path_filename, folder_id):
+def upload_file_1(drive, folder_id, no_path_filename, path_filename):
     t0 = time.time()
 
     filename = os.path.split(path_filename)[1]
@@ -120,3 +120,40 @@ def upload_file_1(drive, no_path_filename, path_filename, folder_id):
 
     t1 = time.time()
     logger.info('Task No.{} [{}] runs {:.2f} seconds.'.format(no_path_filename, filename, t1 - t0))
+
+# 为什么设计成接收一个字典参数，而不是三个位置参数? 方便后续多线程时concurrent.futures.ThreadPoolExecutor.map()
+def upload_file(image):
+    t0 = time.time()
+
+    filename = os.path.split(image['path_filename'])[1]
+    path = os.path.split(image['path_filename'])[0]
+    file_id = id_of_title(image['drive'],filename, image['folder_id'])
+
+    if file_id is not None:
+        file_drive = image['drive'].CreateFile({'id': file_id})
+        drive_file_size = file_drive['fileSize']
+        local_file_size = os.path.getsize(image['path_filename'])
+
+        if drive_file_size != str(local_file_size):
+            #logger.info('Downloading No.{} [{}]'.format(image['linkno'], image['link']))
+            logger.info('Updating No.{} exisiting {} to of Google Drive folder:{}.'.format(
+                                        image['no_path_filename'],filename,os.path.split(path)[1]) )
+            file_drive.SetContentFile(image['path_filename'])
+            file_drive.Upload()
+    else:
+        new_file = image['drive'].CreateFile({
+            'title': filename,
+            'parents': [{
+                'kind': 'drive#fileLink',
+                'id': image['folder_id']
+            }]
+        })
+
+        logger.info('Uploading No.{} new {} to of Google Drive folder:{}.'.format(
+                                image['no_path_filename'],filename,os.path.split(path)[1]) )
+        new_file.SetContentFile(image['path_filename'])
+        new_file.Upload()
+
+
+    t1 = time.time()
+    logger.info('Task No.{} [{}] runs {:.2f} seconds.'.format(image['no_path_filename'], filename, t1 - t0))
